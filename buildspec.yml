@@ -7,6 +7,7 @@ env:
     ECR_REPO: shop-webapp
     AWS_ACCOUNT_ID: 618060700241
     IMAGE_TAG: latest
+    CLUSTER_NAME: shop-webapp-cluster
   exported-variables:
     - IMAGE_TAG
 
@@ -15,6 +16,13 @@ phases:
   install:
     runtime-versions:
       java: corretto21
+    commands:
+      - echo "Installing Kubernetes"
+      - curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+      - chmod +x kubectl
+      - mv kubectl /usr/local/bin/
+      - echo "kubectl installed successfully"
+      
   
   pre_build:
     commands:
@@ -23,6 +31,8 @@ phases:
       - mvn test
       - echo "Logging into ECR"
       - aws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com
+      - echo "Connecting to EKS cluster..."
+      - aws eks update-kubeconfig --region $REGION --name $CLUSTER_NAME
       - echo "Login Successfull"
   build:
     commands:
@@ -39,11 +49,15 @@ phases:
       - echo "Pushing image"
       - docker push $AWS_ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$ECR_REPO:$IMAGE_TAG
       - echo "Succesfully pushed $ECR_REPO:$IMAGE_TAG to ECR"
-
-artifacts:
-  files:
-    - '*.war'
-  base-directory: target
+      - echo "Deploying to EKS..."
+      - kubectl apply -f k8s/
+      - echo "Updating image in deployment..."
+      - |
+        kubectl set image deployment/shop-webapp \
+          shop-webapp=$AWS_ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$ECR_REPO:$IMAGE_TAG
+      - echo "Waiting for rollout to complete..."
+      - kubectl rollout status deployment/shop-webapp
+      - echo "Deployment successful!"
 
 cache:
   paths:
