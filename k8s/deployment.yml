@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shop-webapp
+  labels:
+    app: shop-webapp
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: shop-webapp
+  template:
+    metadata:
+      labels:
+        app: shop-webapp
+    spec:
+      containers:
+        - name: shop-webapp
+          image: 618060700241.dkr.ecr.ap-south-1.amazonaws.com/shop-webapp:latest
+          ports:
+            - containerPort: 8080
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
